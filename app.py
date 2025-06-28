@@ -1,3 +1,4 @@
+#importações
 import streamlit as st
 import pandas as pd
 import seaborn as sns
@@ -7,23 +8,32 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-# Configuração inicial
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report
+from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_samples, silhouette_score
+# Configuração de páginas
 st.set_page_config(page_title="Análise de Hábitos Estudantis", layout="centered")
 
 # Sidebar para navegação
-pagina = st.sidebar.selectbox("Escolha a página", ["Página inicial", "Análise exploratória (EDA)", "Clusterização"])
+pagina = st.sidebar.selectbox("Escolha a página", ["Página inicial", "Análise exploratória (EDA)", "Clusterização", "Classificação"])
 
 
 # Carregar dados
 df = pd.read_csv("student_habits_performance.csv") 
 
+#Preencher dados nulos
 df['parental_education_level'] = df['parental_education_level'].fillna(df['parental_education_level'].mode()[0])
 df.isnull().sum()
 
-categoricas = df.select_dtypes(include='object').columns
-for coluna in categoricas:
-    print(coluna)
-
+# Renomear colunas para português
 df=df.rename(columns={
     'student_id': 'id_aluno',
     'age': 'idade',
@@ -44,7 +54,7 @@ df=df.rename(columns={
 
 })
 
-# Mapeamento de categorias para português
+# Mudar categorias para português
 df['genero'] = df['genero'].replace({
     'Male': 'Maculino',
     'Female': 'Feminino',
@@ -194,41 +204,36 @@ elif pagina == "Análise exploratória (EDA)":
 
     for col in df_no_id.columns:
         plot_coluna(df_no_id, col)
-# prompt: grafico de correlação das variaveis
-    df_filtrado['genero'] = df_filtrado['genero'].replace({
-        'Masculino': 1,
-        'Feminino': -1,
-        'Outro': 0
-    })
+    df_fitrado = pd.get_dummies(df, columns=['genero'])
 
     df_filtrado['trabalho_meio_periodo'] = df_filtrado['trabalho_meio_periodo'].replace({
         'Sim': 1,
         'Não': 0
-    }).astype(int)
+    })
 
     df_filtrado['qualidade_dieta'] = df_filtrado['qualidade_dieta'].replace({
         'Boa': 2,
         'Ruim': 0,
         'Regular':1
-    }).astype(int)
+    })
 
     df_filtrado['nivel_educacao_parental'] = df_filtrado['nivel_educacao_parental'].replace({
         'Ensino Médio': 0,
         'Bacharelado': 1,
         'Mestrado':2,
-    }).astype(int)
+    })
 
     df_filtrado['qualidade_internet'] = df_filtrado['qualidade_internet'].replace({
         'Boa': 2,
         'Ruim': 0,
         'Mediana':1
-    }).astype(int)
+    })
 
 
     df_filtrado['atividades_extracurriculares'] = df_filtrado['atividades_extracurriculares'].replace({
         'Sim': 1,
         'Não': 0
-    }).astype(int)
+    })
 
 # Selecionar apenas as colunas numéricas para o cálculo da correlação
     df_numeric = df_filtrado.select_dtypes(include=np.number)
@@ -297,13 +302,6 @@ elif pagina == "Análise exploratória (EDA)":
     plt.ylabel('nota final')
     st.pyplot(plt.gcf())
 
-#boxplot notas por tempo em redes sociais
-    plt.figure(figsize=(8,5))
-    sns.boxplot(data=df_filtrado, x='horas_redes_sociais', y='nota_exame')
-    plt.title('horas de redes sociais vs Nota Final')
-    plt.xlabel('horas de redes sociais')
-    plt.ylabel('Nota Final')
-    st.pyplot(plt.gcf())
 #scatterplot notas por tempo em redes sociais
     plt.figure(figsize=(8,5))
     sns.regplot(data=df_filtrado, x='horas_redes_sociais', y='nota_exame', line_kws={'color':'red'})
@@ -312,13 +310,6 @@ elif pagina == "Análise exploratória (EDA)":
     plt.ylabel('Nota Final')
     st.pyplot(plt.gcf())
 
-#boxplot notas por tempo em streaming
-    plt.figure(figsize=(8,5))
-    sns.boxplot(data=df_filtrado, x='horas_netflix', y='nota_exame')
-    plt.title('horas de streaming vs Nota Final')
-    plt.xlabel('horas de sstreaming')
-    plt.ylabel('Nota Final')
-    st.pyplot(plt.gcf())
 #scatterplot notas por tempo em redes sociais
     plt.figure(figsize=(8,5))
     sns.regplot(data=df_filtrado, x='horas_netflix', y='nota_exame', line_kws={'color':'red'})
@@ -410,3 +401,109 @@ elif pagina == "Clusterização":
         ax.set_xlabel("Cluster")
         st.pyplot(fig)
 
+    
+# aqui adicionamos a silhueta
+    # --- Calcular a silhueta detalhada ---
+    sample_silhouette_values = silhouette_samples(X_scaled, clusters)
+
+# Calcula o score médio da silhueta (linha vertical no gráfico)
+    score_silhouette = silhouette_score(X_scaled, clusters)
+
+    st.subheader("Silhueta")
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    y_lower = 10  # onde começa a plotagem no eixo y
+
+    for i in range(n_clusters):
+    # pega os valores da silhueta do cluster i
+        ith_cluster_silhouette_values = sample_silhouette_values[clusters == i]
+        ith_cluster_silhouette_values.sort()
+
+        size_cluster_i = ith_cluster_silhouette_values.shape[0]
+        y_upper = y_lower + size_cluster_i
+
+        color = plt.cm.tab10(i)
+        ax.fill_betweenx(np.arange(y_lower, y_upper),
+                         0, ith_cluster_silhouette_values,
+                         facecolor=color, edgecolor=color, alpha=0.7)
+
+    # rotula cluster no meio
+        ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+
+        y_lower = y_upper + 10  # espaço entre clusters
+
+    ax.set_title("Gráfico da silhueta por cluster")
+    ax.set_xlabel("Coeficiente de silhueta")
+    ax.set_ylabel("Pontos amostrados")
+    ax.axvline(x=score_silhouette, color="red", linestyle="--")
+    ax.set_yticks([])  # esconde y ticks
+    ax.set_xlim([-0.1, 1])
+    st.pyplot(fig)
+#Página de Classificação
+elif pagina == "Classificação":
+    st.title("Predição de Desempenho Acadêmico")
+    st.write("""
+    Esta seção permite explorar como dos hábitos estudantis podem ser usados para prever resultados acadêmico.
+    """)
+    #Converter categóricas em numéricas
+    df = pd.get_dummies(df, columns=['genero'])
+
+    df['trabalho_meio_periodo'] = df['trabalho_meio_periodo'].replace({
+        'Sim': 1,
+        'Não': 0
+    })
+
+    df['qualidade_dieta'] = df['qualidade_dieta'].replace({
+        'Boa': 2,
+        'Ruim': 0,
+        'Regular':1
+    })
+
+    df['nivel_educacao_parental'] = df['nivel_educacao_parental'].replace({
+        'Ensino Médio': 0,
+        'Bacharelado': 1,
+        'Mestrado':2,
+    })
+
+    df['qualidade_internet'] = df['qualidade_internet'].replace({
+        'Boa': 2,
+        'Ruim': 0,
+        'Mediana':1
+    })
+
+
+    df['atividades_extracurriculares'] = df['atividades_extracurriculares'].replace({
+        'Sim': 1,
+        'Não': 0
+    })
+
+    X = df.drop(['id_aluno', 'nota_exame'], axis=1)
+    y = (df['nota_exame'] >= 70).astype(int)  # Binary classification: Pass/Fail
+
+# Treino e teste
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    modelos_preditivos = {
+    "Logistic Regression": LogisticRegression(max_iter=1000),
+    "Decision Tree": DecisionTreeClassifier(),
+    "Random Forest": RandomForestClassifier(),
+    "SVM": SVC(),
+    "KNN": KNeighborsClassifier(),
+    "Gradient Boosting": GradientBoostingClassifier()
+}
+    for nome, modelo in modelos_preditivos.items():
+        modelo.fit(X_train, y_train)
+        preds = modelo.predict(X_test)
+        acc = accuracy_score(y_test, preds)*100
+        cm = confusion_matrix(y_test, preds)
+
+# Mostra o relatório (precision, recall, f1-score, support)
+        relatorio = classification_report(y_test, preds, target_names=["Reprovação", "Aprovação"])
+        st.subheader(f"{nome}")
+        st.text(f"Acurácia: {acc:.2f}%")
+        st.text(relatorio)
+    
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Reprovação", "Aprovação"])
+        disp.plot(cmap='Blues')
+        plt.title(f'Confusion Matrix - {nome}')
+        st.pyplot(plt.gcf())
