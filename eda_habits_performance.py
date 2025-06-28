@@ -124,11 +124,58 @@ plt.show()
 # Selecionar apenas as colunas numéricas para o cálculo da correlação
 df_numeric = df.select_dtypes(include=np.number)
 
-# Calcular a matriz de correlação
 correlation_matrix = df_numeric.corr()
 
-# Criar o heatmap da matriz de correlação
+#heatmap da matriz de correlação
 plt.figure(figsize=(12, 10))
-sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=.5)
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1, fmt=".2f", linewidths=.5)
 plt.title('Matriz de Correlação das Variáveis Numéricas')
+plt.show()
+
+#scatterplot horas de estudo e nota do exame
+plt.figure(figsize=(8,5))
+sns.regplot(data=df, x='horas_estudo_por_dia', y='nota_exame', scatter=True, line_kws={"color":"red"})
+plt.title("Horas de estudo vs Nota")
+plt.xlabel("Horas de estudo")
+plt.ylabel("Nota final")
+plt.show()
+
+#boxplot notas por saude mental
+plt.figure(figsize=(8,5))
+sns.boxplot(data=df, x='avaliacao_saude_mental', y='nota_exame')
+plt.title('Notas por Saúde Mental')
+plt.xlabel('Saúde Mental')
+plt.ylabel('Nota Final')
+plt.show()
+
+#scatterplot notas por saude mental
+plt.figure(figsize=(8,5))
+sns.regplot(data=df, x='avaliacao_saude_mental', y='nota_exame', line_kws={'color':'red'})
+plt.title('Saúde Mental vs Nota Final (com linha de tendência)')
+plt.xlabel('Saúde Mental')
+plt.ylabel('Nota Final')
+plt.show()
+
+#boxplot notas por exercicio fisico
+plt.figure(figsize=(8,5))
+sns.boxplot(data=df, x='frequencia_exercicios_fisicos', y='nota_exame')
+plt.title('Notas por Saúde Mental')
+plt.xlabel('Saúde Mental')
+plt.ylabel('Nota Final')
+plt.show()
+
+#scatterplot notas por exercicio fisico
+plt.figure(figsize=(8,5))
+sns.regplot(data=df, x='frequencia_exercicios_fisicos', y='nota_exame', line_kws={'color':'red'})
+plt.title('exercicio fisico vs Nota Final (com linha de tendência)')
+plt.xlabel('exercicio fisico')
+plt.ylabel('Nota Final')
+plt.show()
+
+#scatterplot notas por horas de sono
+plt.figure(figsize=(8,5))
+sns.regplot(data=df, x='horas_sono', y='nota_exame', line_kws={'color':'red'})
+plt.title('horas de sono vs Nota Final (com linha de tendência)')
+plt.xlabel('horas de sono')
+plt.ylabel('nota final')
 plt.show()
