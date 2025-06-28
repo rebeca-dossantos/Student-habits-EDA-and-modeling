@@ -4,11 +4,14 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 # Configuração inicial
 st.set_page_config(page_title="Análise de Hábitos Estudantis", layout="centered")
 
 # Sidebar para navegação
-pagina = st.sidebar.selectbox("Escolha a página", ["Página inicial", "Análise exploratória (EDA), Clusterização"])
+pagina = st.sidebar.selectbox("Escolha a página", ["Página inicial", "Análise exploratória (EDA)", "Clusterização"])
 
 
 # Carregar dados
@@ -192,6 +195,40 @@ elif pagina == "Análise exploratória (EDA)":
     for col in df_no_id.columns:
         plot_coluna(df_no_id, col)
 # prompt: grafico de correlação das variaveis
+    df_filtrado['genero'] = df_filtrado['genero'].replace({
+        'Masculino': 1,
+        'Feminino': -1,
+        'Outro': 0
+    })
+
+    df_filtrado['trabalho_meio_periodo'] = df_filtrado['trabalho_meio_periodo'].replace({
+        'Sim': 1,
+        'Não': 0
+    }).astype(int)
+
+    df_filtrado['qualidade_dieta'] = df_filtrado['qualidade_dieta'].replace({
+        'Boa': 2,
+        'Ruim': 0,
+        'Regular':1
+    }).astype(int)
+
+    df_filtrado['nivel_educacao_parental'] = df_filtrado['nivel_educacao_parental'].replace({
+        'Ensino Médio': 0,
+        'Bacharelado': 1,
+        'Mestrado':2,
+    }).astype(int)
+
+    df_filtrado['qualidade_internet'] = df_filtrado['qualidade_internet'].replace({
+        'Boa': 2,
+        'Ruim': 0,
+        'Mediana':1
+    }).astype(int)
+
+
+    df_filtrado['atividades_extracurriculares'] = df_filtrado['atividades_extracurriculares'].replace({
+        'Sim': 1,
+        'Não': 0
+    }).astype(int)
 
 # Selecionar apenas as colunas numéricas para o cálculo da correlação
     df_numeric = df_filtrado.select_dtypes(include=np.number)
@@ -199,11 +236,18 @@ elif pagina == "Análise exploratória (EDA)":
     correlation_matrix = df_numeric.corr()
 
     st.subheader("Relações entre variáveis")
+
+    
+
 #heatmap da matriz de correlação
     plt.figure(figsize=(12, 10))
     sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1, fmt=".2f", linewidths=.5)
     plt.title('Matriz de Correlação das Variáveis Numéricas')
     st.pyplot(plt.gcf())
+
+
+
+
 
 #scatterplot horas de estudo e nota do exame
     plt.figure(figsize=(8,5))
@@ -253,18 +297,116 @@ elif pagina == "Análise exploratória (EDA)":
     plt.ylabel('nota final')
     st.pyplot(plt.gcf())
 
+#boxplot notas por tempo em redes sociais
+    plt.figure(figsize=(8,5))
+    sns.boxplot(data=df_filtrado, x='horas_redes_sociais', y='nota_exame')
+    plt.title('horas de redes sociais vs Nota Final')
+    plt.xlabel('horas de redes sociais')
+    plt.ylabel('Nota Final')
+    st.pyplot(plt.gcf())
+#scatterplot notas por tempo em redes sociais
+    plt.figure(figsize=(8,5))
+    sns.regplot(data=df_filtrado, x='horas_redes_sociais', y='nota_exame', line_kws={'color':'red'})
+    plt.title('horas de redes sociais vs Nota Final (com linha de tendência)')
+    plt.xlabel('horas de redes sociais')
+    plt.ylabel('Nota Final')
+    st.pyplot(plt.gcf())
+
+#boxplot notas por tempo em streaming
+    plt.figure(figsize=(8,5))
+    sns.boxplot(data=df_filtrado, x='horas_netflix', y='nota_exame')
+    plt.title('horas de streaming vs Nota Final')
+    plt.xlabel('horas de sstreaming')
+    plt.ylabel('Nota Final')
+    st.pyplot(plt.gcf())
+#scatterplot notas por tempo em redes sociais
+    plt.figure(figsize=(8,5))
+    sns.regplot(data=df_filtrado, x='horas_netflix', y='nota_exame', line_kws={'color':'red'})
+    plt.title('horas de streaming vs Nota Final (com linha de tendência)')
+    plt.xlabel('horas de streaming')
+    plt.ylabel('Nota Final')
+    st.pyplot(plt.gcf())
+
+
 
 elif pagina == "Clusterização":
     st.title("Clusterização de Hábitos Estudantis")
     st.write("""
     Esta seção permite explorar a clusterização dos hábitos estudantis e seu impacto no desempenho acadêmico.
-    
-    - Use o menu ao lado para navegar para a análise exploratória.
-    - Veja gráficos interativos, correlações e muito mais.
     """)
+
     
-    # Aqui você pode adicionar a lógica de clusterização e visualização
-    # Exemplo: KMeans, DBSCAN, etc.
+    # --- Preparar dados para clusterização ---
+    df_cluster = df.copy()
+    colunas_para_cluster = [
+    'idade', 
+    'horas_estudo_por_dia', 
+    'horas_sono', 
+    'nota_exame',
+    'frequencia_exercicios_fisicos',
+    'avaliacao_saude_mental',
+    'frequencia_aulas',
+]
+
+# Se tiver LabelEncoder rodado antes, elas já vão estar numéricas
+    X = df_cluster[colunas_para_cluster]
+    # Padroniza
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # --- Método do cotovelo ---
+    st.subheader("Análise do número ideal de clusters (Método do Cotovelo)")
+    wcss = []
+    for k in range(1, 11):
+        kmeans = KMeans(n_clusters=k, random_state=42)
+        kmeans.fit(X_scaled)
+        wcss.append(kmeans.inertia_)
     
-    st.write("Clusterização ainda não implementada.")
- 
+    fig, ax = plt.subplots(figsize=(8,5))
+    ax.plot(range(1, 11), wcss, marker='o')
+    ax.set_title("Método do Cotovelo")
+    ax.set_xlabel("Número de clusters")
+    ax.set_ylabel("Soma das distâncias quadradas intra-clusters (Inertia)")
+    ax.grid(True)
+    st.pyplot(fig)
+
+    # --- Escolha do número de clusters ---
+    n_clusters = st.slider("Escolha o número de clusters", min_value=2, max_value=10, value=3)
+
+    # --- KMeans ---
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    clusters = kmeans.fit_predict(X_scaled)
+    df_result = df.copy()
+    df_result['Cluster'] = clusters
+
+    # --- PCA para visualização ---
+    pca = PCA(n_components=2)
+    pca_result = pca.fit_transform(X_scaled)
+    df_pca = pd.DataFrame(pca_result, columns=['PC1', 'PC2'])
+    df_pca['Cluster'] = clusters
+
+    st.subheader("Visualização dos clusters via PCA")
+    fig, ax = plt.subplots(figsize=(10,6))
+    sns.scatterplot(data=df_pca, x='PC1', y='PC2', hue='Cluster', palette='tab10', alpha=0.7, s=80, ax=ax)
+    ax.set_title("Clusters projetados em 2D pelo PCA")
+    ax.set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0]*100:.1f}% var)")
+    ax.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]*100:.1f}% var)")
+    ax.legend(title="Cluster")
+    st.pyplot(fig)
+
+    # --- Tabela médias numéricas ---
+    st.subheader("Médias das variáveis numéricas por cluster")
+    numericas = [col for col in df_result.select_dtypes(include=['int64', 'float64']).columns if col != 'Cluster']
+    medias_cluster = df_result.groupby('Cluster')[numericas].mean().round(2)
+    st.dataframe(medias_cluster)
+
+    # --- Gráficos barras numéricas ---
+    st.subheader("Gráficos de barras das variáveis numéricas por cluster")
+    for col in numericas:
+        fig, ax = plt.subplots(figsize=(6,4))
+        medias_cluster[col].plot(kind='bar', ax=ax)
+        ax.set_title(f"Média de {col} por Cluster")
+        ax.set_ylabel(col)
+        ax.set_xlabel("Cluster")
+        st.pyplot(fig)
+
