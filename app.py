@@ -19,6 +19,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report
 from sklearn.metrics import silhouette_score
 from sklearn.metrics import silhouette_samples, silhouette_score
+import shap
 # Configuração de páginas
 st.set_page_config(page_title="Análise de Hábitos Estudantis", layout="centered")
 
@@ -444,66 +445,82 @@ elif pagina == "Clusterização":
 elif pagina == "Classificação":
     st.title("Predição de Desempenho Acadêmico")
     st.write("""
-    Esta seção permite explorar como dos hábitos estudantis podem ser usados para prever resultados acadêmico.
+    Esta seção permite explorar como os hábitos estudantis podem ser usados para prever resultados acadêmicos.
     """)
-    #Converter categóricas em numéricas
-    df = pd.get_dummies(df, columns=['genero'])
 
-    df['trabalho_meio_periodo'] = df['trabalho_meio_periodo'].replace({
-        'Sim': 1,
-        'Não': 0
-    })
+    # Encoding categóricos
+    df_encoded = df.copy()
+    df_encoded = pd.get_dummies(df_encoded, columns=['genero'])
 
-    df['qualidade_dieta'] = df['qualidade_dieta'].replace({
-        'Boa': 2,
-        'Ruim': 0,
-        'Regular':1
-    })
+    df_encoded['trabalho_meio_periodo'] = df_encoded['trabalho_meio_periodo'].replace({'Sim':1, 'Não':0})
+    df_encoded['qualidade_dieta'] = df_encoded['qualidade_dieta'].replace({'Boa':2, 'Regular':1, 'Ruim':0})
+    df_encoded['nivel_educacao_parental'] = df_encoded['nivel_educacao_parental'].replace({'Ensino Médio':0, 'Bacharelado':1, 'Mestrado':2})
+    df_encoded['qualidade_internet'] = df_encoded['qualidade_internet'].replace({'Boa':2, 'Mediana':1, 'Ruim':0})
+    df_encoded['atividades_extracurriculares'] = df_encoded['atividades_extracurriculares'].replace({'Sim':1, 'Não':0})
 
-    df['nivel_educacao_parental'] = df['nivel_educacao_parental'].replace({
-        'Ensino Médio': 0,
-        'Bacharelado': 1,
-        'Mestrado':2,
-    })
+    X = df_encoded.drop(['id_aluno', 'nota_exame'], axis=1)
+    y = (df_encoded['nota_exame'] >= 70).astype(int)  # Passou/Não passou
 
-    df['qualidade_internet'] = df['qualidade_internet'].replace({
-        'Boa': 2,
-        'Ruim': 0,
-        'Mediana':1
-    })
+    # Divisão treino/teste
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+    st.subheader("Divisão dos dados")
+
+    st.write(f"Tamanho do conjunto de treino: {X_train.shape[0]} amostras")
+    st.write(f"Tamanho do conjunto de teste: {X_test.shape[0]} amostras")
+
+    st.write("Distribuição das classes no treino:")
+    st.write(y_train.value_counts())
+
+    st.write("Distribuição das classes no teste:")
+    st.write(y_test.value_counts())
 
 
-    df['atividades_extracurriculares'] = df['atividades_extracurriculares'].replace({
-        'Sim': 1,
-        'Não': 0
-    })
+    # Padronização
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
 
-    X = df.drop(['id_aluno', 'nota_exame'], axis=1)
-    y = (df['nota_exame'] >= 70).astype(int)  # Binary classification: Pass/Fail
-
-# Treino e teste
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     modelos_preditivos = {
-    "Logistic Regression": LogisticRegression(max_iter=1000),
-    "Decision Tree": DecisionTreeClassifier(),
-    "Random Forest": RandomForestClassifier(),
-    "SVM": SVC(),
-    "KNN": KNeighborsClassifier(),
-    "Gradient Boosting": GradientBoostingClassifier()
-}
+        "Logistic Regression": LogisticRegression(max_iter=1000, class_weight='balanced'),
+        "Decision Tree": DecisionTreeClassifier(class_weight='balanced'),
+        "Random Forest": RandomForestClassifier(class_weight='balanced'),
+        "SVM": SVC(probability=True, class_weight='balanced'),
+        "KNN": KNeighborsClassifier(),
+        "Gradient Boosting": GradientBoostingClassifier()
+    }
+
+    melhores_modelos = {}
     for nome, modelo in modelos_preditivos.items():
         modelo.fit(X_train, y_train)
         preds = modelo.predict(X_test)
         acc = accuracy_score(y_test, preds)*100
         cm = confusion_matrix(y_test, preds)
-
-# Mostra o relatório (precision, recall, f1-score, support)
         relatorio = classification_report(y_test, preds, target_names=["Reprovação", "Aprovação"])
+
         st.subheader(f"{nome}")
         st.text(f"Acurácia: {acc:.2f}%")
         st.text(relatorio)
-    
+
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Reprovação", "Aprovação"])
         disp.plot(cmap='Blues')
-        plt.title(f'Confusion Matrix - {nome}')
+        plt.title(f'Matriz de Confusão - {nome}')
         st.pyplot(plt.gcf())
+        plt.clf()
+
+        melhores_modelos[nome] = (modelo, acc)
+
+    # Escolher melhor modelo para explicabilidade SHAP
+    melhor_nome = max(melhores_modelos, key=lambda k: melhores_modelos[k][1])
+    melhor_modelo = melhores_modelos[melhor_nome][0]
+
+    st.header(f"Explicabilidade do modelo final: {melhor_nome} (SHAP)")
+
+    # SHAP
+    explainer = shap.Explainer(melhor_modelo, X_train)
+    shap_values = explainer(X_test)
+
+    #st.set_option('deprecation.showPyplotGlobalUse', False)
+    ig, ax = plt.subplots(figsize=(10, 6))
+    shap.summary_plot(shap_values, features=X_test, feature_names=X.columns)
+    st.pyplot(plt.gcf())
