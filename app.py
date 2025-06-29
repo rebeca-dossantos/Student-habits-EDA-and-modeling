@@ -267,8 +267,8 @@ elif pagina == "Análise exploratória (EDA)":
 #boxplot notas por exercicio fisico
     plt.figure(figsize=(8,5))
     sns.boxplot(data=df_filtrado, x='frequencia_exercicios_fisicos', y='nota_exame')
-    plt.title('Notas por Saúde Mental')
-    plt.xlabel('Saúde Mental')
+    plt.title('Notas por Frequencia de Exercícios')
+    plt.xlabel('Frequência de Exercícios')
     plt.ylabel('Nota Final')
     st.pyplot(plt.gcf())
 
