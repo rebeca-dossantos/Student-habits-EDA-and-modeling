@@ -20,12 +20,13 @@ from sklearn.metrics import classification_report
 from sklearn.metrics import silhouette_score
 from sklearn.metrics import silhouette_samples, silhouette_score
 import shap
+from sklearn.metrics import roc_curve, auc
+
 # Configuração de páginas
 st.set_page_config(page_title="Análise de Hábitos Estudantis", layout="centered")
 
 # Sidebar para navegação
 pagina = st.sidebar.selectbox("Escolha a página", ["Página inicial", "Análise exploratória (EDA)", "Clusterização", "Classificação"])
-
 
 # Carregar dados
 df = pd.read_csv("student_habits_performance.csv") 
@@ -97,9 +98,9 @@ if pagina == "Página inicial":
     o desempenho acadêmico dos estudantes.
     
     - Use o menu ao lado para navegar para a análise exploratória.
-    - Veja gráficos interativos, correlações e muito mais.
+    - Veja gráficos interativos, correlações e uso de modelos preditivos.
     """)
-    st.write(df.head())
+    st.write(df.describe())
 
 # Página de EDA
 elif pagina == "Análise exploratória (EDA)":
@@ -125,19 +126,18 @@ elif pagina == "Análise exploratória (EDA)":
     educacao = df['nivel_educacao_parental'].unique().tolist()
     filtro_educacao = st.sidebar.multiselect("Nível de educação parental", options=educacao, default=educacao)
 
-# Filtro de idade (slider com mínimo e máximo do dataset)
+# Filtro de idade (slider)
     idade_min = int(df['idade'].min())
     idade_max = int(df['idade'].max())
     filtro_idade = st.sidebar.slider("Idade", min_value=idade_min, max_value=idade_max, value=(idade_min, idade_max))
-# Filtro de horas de estudo (slider com mínimo e máximo do dataset)
+# Filtro de horas de estudo (slider )
     estudo_min = int(df['horas_estudo_por_dia'].min())
     estudo_max = int(df['horas_estudo_por_dia'].max())
     filtro_estudo = st.sidebar.slider("Média de horas de estudo por dia", min_value=estudo_min, max_value=estudo_max, value=(estudo_min, estudo_max))
-# Filtro de horas de redes sociais(slider com mínimo e máximo do dataset)
+# Filtro de horas de redes sociais(slider)
     social_min = int(df['horas_redes_sociais'].min())
     social_max = int(df['horas_redes_sociais'].max())
     filtro_social= st.sidebar.slider("Média de horas de em redes sociais", min_value=social_min, max_value=social_max, value=(social_min, social_max))
-
 # Filtro frequência exercícios (slider)
     ex_min = int(df['frequencia_exercicios_fisicos'].min())
     ex_max = int(df['frequencia_exercicios_fisicos'].max())
@@ -199,42 +199,33 @@ elif pagina == "Análise exploratória (EDA)":
         plt.close(fig)
     
         df_no_id = df_filtrado.drop('id_aluno', axis=1)
-
-    
+   
     df_no_id = df_filtrado.drop('id_aluno', axis=1)
 
     for col in df_no_id.columns:
         plot_coluna(df_no_id, col)
+
+#Convertendo variáveis categoricas em numéricas
     df_fitrado = pd.get_dummies(df, columns=['genero'])
 
     df_filtrado['trabalho_meio_periodo'] = df_filtrado['trabalho_meio_periodo'].replace({
         'Sim': 1,
-        'Não': 0
-    })
-
+        'Não': 0})
     df_filtrado['qualidade_dieta'] = df_filtrado['qualidade_dieta'].replace({
         'Boa': 2,
         'Ruim': 0,
-        'Regular':1
-    })
-
+        'Regular':1})
     df_filtrado['nivel_educacao_parental'] = df_filtrado['nivel_educacao_parental'].replace({
         'Ensino Médio': 0,
         'Bacharelado': 1,
-        'Mestrado':2,
-    })
-
+        'Mestrado':2,})
     df_filtrado['qualidade_internet'] = df_filtrado['qualidade_internet'].replace({
         'Boa': 2,
         'Ruim': 0,
-        'Mediana':1
-    })
-
-
+        'Mediana':1})
     df_filtrado['atividades_extracurriculares'] = df_filtrado['atividades_extracurriculares'].replace({
         'Sim': 1,
-        'Não': 0
-    })
+        'Não': 0})
 
 # Selecionar apenas as colunas numéricas para o cálculo da correlação
     df_numeric = df_filtrado.select_dtypes(include=np.number)
@@ -243,17 +234,11 @@ elif pagina == "Análise exploratória (EDA)":
 
     st.subheader("Relações entre variáveis")
 
-    
-
 #heatmap da matriz de correlação
     plt.figure(figsize=(12, 10))
     sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1, fmt=".2f", linewidths=.5)
     plt.title('Matriz de Correlação das Variáveis Numéricas')
     st.pyplot(plt.gcf())
-
-
-
-
 
 #scatterplot horas de estudo e nota do exame
     plt.figure(figsize=(8,5))
@@ -319,16 +304,14 @@ elif pagina == "Análise exploratória (EDA)":
     plt.ylabel('Nota Final')
     st.pyplot(plt.gcf())
 
-
-
+# Página de Clusterização
 elif pagina == "Clusterização":
     st.title("Clusterização de Hábitos Estudantis")
     st.write("""
     Esta seção permite explorar a clusterização dos hábitos estudantis e seu impacto no desempenho acadêmico.
     """)
 
-    
-    # --- Preparar dados para clusterização ---
+# Selecionar colunas para a clusterização
     df_cluster = df.copy()
     colunas_para_cluster = [
     'idade', 
@@ -340,13 +323,12 @@ elif pagina == "Clusterização":
     'frequencia_aulas',
 ]
 
-# Se tiver LabelEncoder rodado antes, elas já vão estar numéricas
     X = df_cluster[colunas_para_cluster]
     # Padroniza
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # --- Método do cotovelo ---
+# Método do cotovelo 
     st.subheader("Análise do número ideal de clusters (Método do Cotovelo)")
     wcss = []
     for k in range(1, 11):
@@ -362,16 +344,15 @@ elif pagina == "Clusterização":
     ax.grid(True)
     st.pyplot(fig)
 
-    # --- Escolha do número de clusters ---
+# Slider número de clusters
     n_clusters = st.slider("Escolha o número de clusters", min_value=2, max_value=10, value=3)
 
-    # --- KMeans ---
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     clusters = kmeans.fit_predict(X_scaled)
     df_result = df.copy()
     df_result['Cluster'] = clusters
 
-    # --- PCA para visualização ---
+#PCA
     pca = PCA(n_components=2)
     pca_result = pca.fit_transform(X_scaled)
     df_pca = pd.DataFrame(pca_result, columns=['PC1', 'PC2'])
@@ -386,13 +367,13 @@ elif pagina == "Clusterização":
     ax.legend(title="Cluster")
     st.pyplot(fig)
 
-    # --- Tabela médias numéricas ---
+# Tabela médias
     st.subheader("Médias das variáveis numéricas por cluster")
     numericas = [col for col in df_result.select_dtypes(include=['int64', 'float64']).columns if col != 'Cluster']
     medias_cluster = df_result.groupby('Cluster')[numericas].mean().round(2)
     st.dataframe(medias_cluster)
 
-    # --- Gráficos barras numéricas ---
+# Gráficos de barras 
     st.subheader("Gráficos de barras das variáveis numéricas por cluster")
     for col in numericas:
         fig, ax = plt.subplots(figsize=(6,4))
@@ -403,8 +384,7 @@ elif pagina == "Clusterização":
         st.pyplot(fig)
 
     
-# aqui adicionamos a silhueta
-    # --- Calcular a silhueta detalhada ---
+# Calcular a silhueta
     sample_silhouette_values = silhouette_samples(X_scaled, clusters)
 
 # Calcula o score médio da silhueta (linha vertical no gráfico)
@@ -417,7 +397,7 @@ elif pagina == "Clusterização":
     y_lower = 10  # onde começa a plotagem no eixo y
 
     for i in range(n_clusters):
-    # pega os valores da silhueta do cluster i
+# pega os valores da silhueta do cluster i
         ith_cluster_silhouette_values = sample_silhouette_values[clusters == i]
         ith_cluster_silhouette_values.sort()
 
@@ -429,7 +409,7 @@ elif pagina == "Clusterização":
                          0, ith_cluster_silhouette_values,
                          facecolor=color, edgecolor=color, alpha=0.7)
 
-    # rotula cluster no meio
+# rotula cluster no meio
         ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
 
         y_lower = y_upper + 10  # espaço entre clusters
@@ -441,6 +421,7 @@ elif pagina == "Clusterização":
     ax.set_yticks([])  # esconde y ticks
     ax.set_xlim([-0.1, 1])
     st.pyplot(fig)
+
 #Página de Classificação
 elif pagina == "Classificação":
     st.title("Predição de Desempenho Acadêmico")
@@ -448,7 +429,7 @@ elif pagina == "Classificação":
     Esta seção permite explorar como os hábitos estudantis podem ser usados para prever resultados acadêmicos.
     """)
 
-    # Encoding categóricos
+# Encoding categóricos
     df_encoded = df.copy()
     df_encoded = pd.get_dummies(df_encoded, columns=['genero'])
 
@@ -461,7 +442,7 @@ elif pagina == "Classificação":
     X = df_encoded.drop(['id_aluno', 'nota_exame'], axis=1)
     y = (df_encoded['nota_exame'] >= 70).astype(int)  # Passou/Não passou
 
-    # Divisão treino/teste
+# Divisão treino/teste
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     st.subheader("Divisão dos dados")
@@ -476,7 +457,7 @@ elif pagina == "Classificação":
     st.write(y_test.value_counts())
 
 
-    # Padronização
+# Padronização
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
@@ -510,17 +491,33 @@ elif pagina == "Classificação":
 
         melhores_modelos[nome] = (modelo, acc)
 
-    # Escolher melhor modelo para explicabilidade SHAP
+#Escolher melhor modelo
     melhor_nome = max(melhores_modelos, key=lambda k: melhores_modelos[k][1])
     melhor_modelo = melhores_modelos[melhor_nome][0]
 
+#ROC
+    st.subheader("Melhor modelo: Regressão logística")
+    st.write(f"Curva ROC para o Regressão Logística")
+    probs = melhor_modelo.predict_proba(X_test)[:, 1]
+    fpr, tpr, thresholds = roc_curve(y_test, probs)
+    roc_auc = auc(fpr, tpr)
+
+    fig, ax = plt.subplots()
+    ax.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    ax.plot([0, 1], [0, 1], 'k--')
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    ax.set_title(f'Curva ROC - {melhor_nome}')
+    ax.legend(loc='lower right')
+    st.pyplot(fig)
+
+
     st.header(f"Explicabilidade do modelo final: {melhor_nome} (SHAP)")
 
-    # SHAP
+# Shap
     explainer = shap.Explainer(melhor_modelo, X_train)
     shap_values = explainer(X_test)
 
-    #st.set_option('deprecation.showPyplotGlobalUse', False)
     ig, ax = plt.subplots(figsize=(10, 6))
     shap.summary_plot(shap_values, features=X_test, feature_names=X.columns)
     st.pyplot(plt.gcf())
